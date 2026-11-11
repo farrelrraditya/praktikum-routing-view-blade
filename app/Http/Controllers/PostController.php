@@ -2,78 +2,34 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Post;
+use Illuminate\Http\Request;
 
 class PostController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(Request $request)
     {
-    $posts = Post::all();
+        // 1. Ambil kata kunci pencarian
+        $search = $request->query('search', '');
 
-    return view('posts.index', compact('posts'));
-    }   
+        // 2. Ambil parameter 'perPage' dari URL/request, default 10 jika tidak ada
+        $perPage = (int) $request->query('perPage', 10);
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        return view('posts.create');
-    }
+        // 3. Validasi agar nilai perPage hanya boleh 5, 10, atau 25
+        if (! in_array($perPage, [5, 10, 25], true)) {
+            $perPage = 10;
+        }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-    $request->validate([
-        'title' => 'required|max:200',
-        'description' => 'required',
-    ]);
+        // 4. Eksekusi query dengan paginate($perPage) dinamis
+        $posts = Post::query()
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where('title', 'like', '%' . $search . '%');
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage) // <-- PASTI KAN MENGGUNAKAN VARIABEL $perPage DI SINI
+            ->withQueryString();
 
-    Post::create($request->only([
-        'title',
-        'description'
-    ]));
-
-    return redirect()->route('posts.index');
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show($id)
-    {
-    $post = Post::find($id);
-
-    return view('posts.show', compact('post'));
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        // 5. Kirim variabel $perPage ke view Blade
+        return view('posts.index', compact('posts', 'search', 'perPage'));
     }
 }

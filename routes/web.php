@@ -1,71 +1,48 @@
+
 <?php
 
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PortfolioController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\TechnologyController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\PostController;
 
-Route::resource('posts', PostController::class);
+// Halaman publik
+Route::get('/', [PortfolioController::class, 'index'])
+    ->name('home');
 
-Route::prefix('portfolio')->group(function() {
-    Route::get('/', fn() => view('portfolio.home'))
-        ->name('portfolio.home');
+// Dashboard setelah login
+Route::get('/dashboard', function () {
+    return view('dashboard');
+})->middleware(['auth', 'verified'])->name('dashboard');
 
-    Route::get('/about', fn() => view('portfolio.about'))
-        ->name('portfolio.about');
+// Route yang wajib login dan memiliki hak admin
+Route::prefix('post')
+    ->name('post.')
+    ->middleware(['auth', 'admin'])
+    ->group(function () {
+        Route::resource('projects', ProjectController::class);
+        Route::resource('categories', CategoryController::class);
+        Route::resource('technologies', TechnologyController::class);
+    });
 
-    Route::get('/projects', fn() => view('portfolio.projects'))
-        ->name('portfolio.projects');
+require __DIR__.'/auth.php';
+
+// Route untuk pengelolaan profil pengguna
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])
+        ->name('profile.edit');
+
+    Route::patch('/profile', [ProfileController::class, 'update'])
+        ->name('profile.update');
+
+    Route::delete('/profile', [ProfileController::class, 'destroy'])
+        ->name('profile.destroy');
 });
 
-Route::get('/halo-dunia', function() {
-    return view('halo_dunia');
-});
-
-Route::get('/portfolio', function () {
-    return view('portfolio.home');
-});
-
-Route::get('/profil', function () {
-    $nama = 'Farrel';
-    $umur = 19;
-    $kota = 'Jogja';
-
-    return view('profil', compact(
-        'nama',
-        'umur',
-        'kota'
-    ));
-});
-
-Route::get('/halo-blade', function() {
-    return view('halo', [
-        'data' => 'Contoh data'
+Route::get('/post/profile-saya', function () {
+    return view('posts.profile-saya', [
+        'user' => Auth::user(),
     ]);
-});
-
-Route::get('/profil', function () {
-    $nama = 'Farrel';
-    $umur = 20;
-    $data = 'kursi';
-
-    return view('profil', compact('nama', 'umur'));
-});
-
-Route::get('/projects', function () {
-    return view('projects');
-})->name('projects');
-
-
-Route::get('/', function () {
-    return view('home');
-})->name('home');
-
-Route::get('/about', function () {
-    return view('about');
-})->name('about');
-
-Route::get('/education', function () {
-    return view('education');
-})->name('education');
-
-
-
+})->middleware('auth')->name('post.profile-saya');
