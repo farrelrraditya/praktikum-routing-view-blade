@@ -2,69 +2,141 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\Category;
 use App\Models\Project;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ProjectController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-
-
     public function index()
     {
-        $projects = Project::all();
+        $projects = Project::with('category')
+            ->latest()
+            ->get();
 
-        return view('projects.index', compact('projects'));
+        return view('posts.projects.index', compact('projects'));
     }
-    /**
-     * Show the form for creating a new resource.
-     */
+
     public function create()
     {
-        //
+        return view('posts.projects.create', [
+            'categories' => Category::all(),
+        ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'category_id' => 'required|exists:categories,id',
+            'status' => 'required|in:draft,published',
+            'thumbnail' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048',
+                'dimensions:min_width=400,min_height=300',
+            ],
+        ]);
+
+        $newPath = null;
+
+        if ($request->hasFile('thumbnail')) {
+            $newPath = $request->file('thumbnail')
+                ->store('projects/thumbnails', 'public');
+
+            $validated['thumbnail'] = $newPath;
+        }
+
+        try {
+            Project::create($validated);
+        } catch (\Throwable $e) {
+            if ($newPath) {
+                Storage::disk('public')->delete($newPath);
+            }
+
+            throw $e;
+        }
+
+        return redirect()
+            ->route('post.projects.index')
+            ->with('success', 'Project berhasil ditambahkan.');
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show($id)
+    public function show(Project $project)
     {
-        $project = Project::find($id);
+        $project->load(['category', 'images']);
 
-        return view('projects.show', compact('project'));
+        return view('posts.projects.show', compact('project'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function edit(Project $project)
     {
-        //
+        $project->load('images');
+
+        return view('posts.projects.edit', [
+            'project' => $project,
+            'categories' => Category::all(),
+        ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+
+    public function update(Request $request, Project $project)
     {
-        //
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'category_id' => 'required|exists:categories,id',
+            'thumbnail' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048|dimensions:min_width=400,min_height=300',
+        ]);
+
+        $oldThumbnail = $project->thumbnail;
+
+        if ($request->hasFile('thumbnail')) {
+            $validated['thumbnail'] = $request
+                ->file('thumbnail')
+                ->store('projects/thumbnails', 'public');
+        }
+
+        $project->update($validated);
+
+        if (
+            $request->hasFile('thumbnail') &&
+            $oldThumbnail
+        ) {
+            Storage::disk('public')->delete($oldThumbnail);
+        }
+
+        return redirect()
+            ->route('post.projects.index')
+            ->with('success', 'Project berhasil diperbarui!');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Project $project)
     {
-        //
+        $project->load('images');
+
+        // Simpan referensi file sebelum record dihapus.
+        $paths = $project->images
+            ->pluck('image')
+            ->filter()
+            ->all();
+
+        if ($project->thumbnail) {
+            $paths[] = $project->thumbnail;
+        }
+
+        // Menghapus project juga menghapus record gallery
+        // melalui foreign key cascadeOnDelete.
+        $project->delete();
+
+        // File fisik dibersihkan setelah record berhasil dihapus.
+        Storage::disk('public')->delete($paths);
+
+        return redirect()
+            ->route('post.projects.index')
+            ->with('success', 'Project berhasil dihapus.');
     }
 }

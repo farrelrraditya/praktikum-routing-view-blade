@@ -8,8 +8,17 @@ class PortfolioController extends Controller
 {
     public function index()
     {
-        $projects = Project::all();
+        $projects = Project::with('category')
+            ->latest()
+            ->get();
 
-        return view('projects.index', compact('projects'));
+        return view('portfolio.index', compact('projects'));
+    }
+
+    public function show(Project $project)
+    {
+        $project->load(['category', 'images']);
+
+        return view('portfolio.show', compact('project'));
     }
 }
