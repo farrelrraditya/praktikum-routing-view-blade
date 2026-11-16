@@ -9,11 +9,28 @@ use Illuminate\Support\Facades\Storage;
 
 class ProjectController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $projects = Project::with('category')
-            ->latest()
-            ->get();
+        // Query dasar project.
+        $query = Project::with('category');
+
+        // SEARCH: pencarian berdasarkan judul dan deskripsi.
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', '%' . $search . '%')
+                    ->orWhere('description', 'like', '%' . $search . '%');
+            });
+        }
+
+        // FILTER: penyaringan berdasarkan status.
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // PAGINATION: menampilkan 6 project per halaman.
+        $projects = $query->latest()->paginate(6)->withQueryString();
 
         return view('posts.projects.index', compact('projects'));
     }

@@ -1,4 +1,3 @@
-
 <?php
 
 use App\Http\Controllers\ProfileController;
@@ -38,7 +37,6 @@ Route::prefix('post')
         Route::resource('technologies', TechnologyController::class);
         Route::resource('skills', SkillController::class)
         ->only(['index', 'edit', 'update']);
-
 
         Route::post(
             'projects/{project}/gallery',
